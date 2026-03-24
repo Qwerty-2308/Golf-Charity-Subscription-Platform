@@ -15,6 +15,9 @@ import {
   submitWinnerClaim,
   updateUserPreferences,
 } from "@/lib/platform";
+import { isDemoMode } from "@/lib/env";
+import { createSupabaseServerClient } from "@/lib/supabase/server";
+import { createSupabaseAdminClient } from "@/lib/supabase/server-admin";
 import type { CharityTier, ClaimStatus, DrawMode, FrequencyBias } from "@/lib/types";
 
 function getRequiredString(formData: FormData, key: string) {
@@ -28,26 +31,74 @@ function getRequiredString(formData: FormData, key: string) {
 export async function loginAction(formData: FormData) {
   const email = getRequiredString(formData, "email");
   const password = getRequiredString(formData, "password");
-  const profile = authenticateDemoUser(email, password);
 
-  if (!profile) {
+  if (isDemoMode()) {
+    const profile = authenticateDemoUser(email, password);
+    if (!profile) {
+      redirect("/sign-in?error=invalid-credentials");
+    }
+    await createDemoSession(profile);
+    redirect(profile.role === "admin" ? "/admin" : "/dashboard");
+  }
+
+  // Live mode: Supabase email/password sign-in
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) {
+    redirect("/sign-in?error=server-error");
+  }
+
+  const { error } = await supabase.auth.signInWithPassword({ email, password });
+  if (error) {
     redirect("/sign-in?error=invalid-credentials");
   }
 
-  await createDemoSession(profile);
-  redirect(profile.role === "admin" ? "/admin" : "/dashboard");
+  // Determine role from profiles table
+  const { data: { user } } = await supabase.auth.getUser();
+  if (!user) redirect("/sign-in?error=invalid-credentials");
+
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("role")
+    .eq("auth_user_id", user!.id)
+    .single();
+
+  redirect(profile?.role === "admin" ? "/admin" : "/dashboard");
 }
 
 export async function signupAction(formData: FormData) {
-  const profile = createDemoSubscriber({
-    fullName: getRequiredString(formData, "fullName"),
-    email: getRequiredString(formData, "email"),
-    password: getRequiredString(formData, "password"),
-    selectedCharityId: getRequiredString(formData, "charityId"),
-    charityTier: Number(getRequiredString(formData, "charityTier")) as CharityTier,
+  const fullName = getRequiredString(formData, "fullName");
+  const email = getRequiredString(formData, "email");
+  const password = getRequiredString(formData, "password");
+  const charityId = getRequiredString(formData, "charityId");
+  const charityTier = Number(getRequiredString(formData, "charityTier")) as CharityTier;
+
+  if (isDemoMode()) {
+    const profile = createDemoSubscriber({ fullName, email, password, selectedCharityId: charityId, charityTier });
+    await createDemoSession(profile);
+    redirect("/pricing?welcome=1");
+  }
+
+  // Live mode: create Supabase Auth user
+  const supabase = await createSupabaseServerClient();
+  if (!supabase) redirect("/sign-in?error=server-error");
+
+  const { data: signUpData, error: signUpError } = await supabase!.auth.signUp({ email, password });
+  if (signUpError || !signUpData.user) {
+    redirect("/sign-in?error=signup-failed");
+  }
+
+  // Insert profile row linked to auth user
+  await supabase!.from("profiles").insert({
+    auth_user_id: signUpData.user.id,
+    full_name: fullName,
+    email: email.toLowerCase(),
+    role: "subscriber",
+    selected_charity_id: charityId,
+    charity_tier: String(charityTier),
+    country_code: "IN",
+    currency_code: "INR",
   });
 
-  await createDemoSession(profile);
   redirect("/pricing?welcome=1");
 }
 
@@ -63,6 +114,10 @@ export async function demoSubscriptionAction(formData: FormData) {
 }
 
 export async function logoutAction() {
+  if (!isDemoMode()) {
+    const supabase = await createSupabaseServerClient();
+    if (supabase) await supabase.auth.signOut();
+  }
   await clearDemoSession();
   redirect("/");
 }
@@ -137,4 +192,49 @@ export async function adminResyncSubscriptionAction(formData: FormData) {
   resyncSubscription(getRequiredString(formData, "subscriptionId"));
   revalidatePath("/admin");
   redirect("/admin?status=subscription-resynced");
+}
+
+export async function adminDeleteUserAction(formData: FormData) {
+  await requireAdmin();
+  const profileId = getRequiredString(formData, "profileId");
+
+  if (isDemoMode()) {
+    // Remove from in-memory demo store
+    const { mutateDemoStore } = await import("@/lib/demo-store");
+    mutateDemoStore((store) => {
+      store.profiles = store.profiles.filter((p) => p.id !== profileId);
+      store.subscriptions = store.subscriptions.filter((s) => s.userId !== profileId);
+      store.scoreEntries = store.scoreEntries.filter((s) => s.userId !== profileId);
+      store.demoAccounts = store.demoAccounts.filter((a) => a.userId !== profileId);
+    });
+    revalidatePath("/admin");
+    redirect("/admin?status=user-deleted");
+  }
+
+  // Live mode: delete from Supabase
+  const supabase = await createSupabaseServerClient();
+  const admin = createSupabaseAdminClient();
+
+  if (!supabase || !admin) {
+    redirect("/admin?error=server-error");
+  }
+
+  // Get the auth_user_id from profiles first
+  const { data: profile } = await supabase
+    .from("profiles")
+    .select("auth_user_id")
+    .eq("id", profileId)
+    .single();
+
+  // Delete profile row (cascades on subscriptions/scores via DB FK if configured,
+  // otherwise handled by RLS + manual cleanup)
+  await supabase.from("profiles").delete().eq("id", profileId);
+
+  // Delete from Supabase Auth (requires service role)
+  if (profile?.auth_user_id) {
+    await admin.auth.admin.deleteUser(profile.auth_user_id);
+  }
+
+  revalidatePath("/admin");
+  redirect("/admin?status=user-deleted");
 }

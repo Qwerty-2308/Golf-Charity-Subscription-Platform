@@ -1,4 +1,4 @@
-import { adminResyncSubscriptionAction, publishDrawAction, reviewClaimAction } from "@/app/actions";
+import { adminDeleteUserAction, adminResyncSubscriptionAction, publishDrawAction, reviewClaimAction } from "@/app/actions";
 import { Badge } from "@/components/ui/badge";
 import { Card } from "@/components/ui/card";
 import { getAdminSnapshot, simulateMonthlyDraw } from "@/lib/platform";
@@ -220,6 +220,18 @@ export default async function AdminPage({
                     </button>
                   </form>
                 ) : null}
+                <form
+                  action={adminDeleteUserAction}
+                  className="mt-2"
+                  onSubmit={(e) => {
+                    if (!confirm(`Remove ${user.profile.fullName} permanently?`)) e.preventDefault();
+                  }}
+                >
+                  <input type="hidden" name="profileId" value={user.profile.id} />
+                  <button className="text-sm font-medium text-danger">
+                    Remove user
+                  </button>
+                </form>
               </div>
             ))}
           </div>
