@@ -82,6 +82,7 @@ export async function getHomeSnapshot() {
     charityLedger: store.charityLedger,
     donations: store.donationLedger,
     payouts: store.payoutLedger,
+    claims: store.winnerClaims,
   });
   const featuredCharity = store.charities.find((charity) => charity.featured) ?? store.charities[0];
   const plans = store.plans.map((plan) => ({
@@ -261,6 +262,7 @@ export async function getAdminSnapshot() {
     charityLedger: store.charityLedger,
     donations: store.donationLedger,
     payouts: store.payoutLedger,
+    claims: store.winnerClaims,
   });
   const claims = store.winnerClaims
     .map((claim) => ({

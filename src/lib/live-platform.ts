@@ -324,6 +324,7 @@ export async function getLiveAdminSnapshot() {
       status: r.status as "pending" | "paid",
       recordedAt: r.recorded_at as string,
     })),
+    claims: (claimRows ?? []).map((row) => mapClaim(row as Record<string, unknown>)),
   });
 
   const getRollingFive = (userId: string) =>
@@ -808,6 +809,7 @@ export async function getLiveHomeSnapshot() {
       status: r.status as "pending" | "paid",
       recordedAt: r.recorded_at as string,
     })),
+    claims: [],
   });
 
   const featuredCharity = charities.find((c) => c.featured) ?? charities[0];

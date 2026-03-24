@@ -83,7 +83,12 @@ export async function signupAction(formData: FormData) {
   const charityTier = Number(getRequiredString(formData, "charityTier")) as CharityTier;
 
   if (isDemoMode()) {
-    const profile = createDemoSubscriber({ fullName, email, password, selectedCharityId: charityId, charityTier });
+    let profile;
+    try {
+      profile = createDemoSubscriber({ fullName, email, password, selectedCharityId: charityId, charityTier });
+    } catch (error) {
+      redirect(`/sign-in?error=${error instanceof Error ? "signup-failed" : "signup-failed"}`);
+    }
     await createDemoSession(profile);
     redirect("/pricing?welcome=1");
   }
@@ -138,11 +143,15 @@ export async function logoutAction() {
 
 export async function saveScoreAction(formData: FormData) {
   const viewer = await requireViewer();
-  saveUserScore(viewer.profile.id, {
-    id: (formData.get("scoreId") as string) || undefined,
-    score: Number(getRequiredString(formData, "score")),
-    playedAt: getRequiredString(formData, "playedAt"),
-  });
+  try {
+    await saveUserScore(viewer.profile.id, {
+      id: (formData.get("scoreId") as string) || undefined,
+      score: Number(getRequiredString(formData, "score")),
+      playedAt: getRequiredString(formData, "playedAt"),
+    });
+  } catch {
+    redirect("/dashboard?error=invalid-score");
+  }
   revalidatePath("/dashboard");
   redirect("/dashboard?status=score-saved");
 }
@@ -222,21 +231,29 @@ export async function publishDrawAction(formData: FormData) {
   const viewer = await requireAdmin();
   if (!isDemoMode()) {
     const { publishLiveDraw } = await import("@/lib/live-platform");
-    await publishLiveDraw({
+    try {
+      await publishLiveDraw({
+        actorId: viewer.profile.id,
+        monthKey: getRequiredString(formData, "monthKey"),
+        mode: getRequiredString(formData, "mode") as DrawMode,
+        bias: (formData.get("bias") as FrequencyBias | null) ?? undefined,
+      });
+    } catch {
+      redirect("/admin?error=draw-publish-failed");
+    }
+    revalidatePath("/admin");
+    redirect("/admin?status=draw-published");
+  }
+  try {
+    publishMonthlyDraw({
       actorId: viewer.profile.id,
       monthKey: getRequiredString(formData, "monthKey"),
       mode: getRequiredString(formData, "mode") as DrawMode,
       bias: (formData.get("bias") as FrequencyBias | null) ?? undefined,
     });
-    revalidatePath("/admin");
-    redirect("/admin?status=draw-published");
+  } catch {
+    redirect("/admin?error=draw-publish-failed");
   }
-  publishMonthlyDraw({
-    actorId: viewer.profile.id,
-    monthKey: getRequiredString(formData, "monthKey"),
-    mode: getRequiredString(formData, "mode") as DrawMode,
-    bias: (formData.get("bias") as FrequencyBias | null) ?? undefined,
-  });
   revalidatePath("/admin");
   redirect("/admin?status=draw-published");
 }
@@ -354,12 +371,16 @@ export async function adminCreateAccountAction(formData: FormData) {
     redirect("/admin?status=account-created");
   }
 
-  createDemoAdminAccount({
-    fullName,
-    email,
-    password,
-    role,
-  });
+  try {
+    createDemoAdminAccount({
+      fullName,
+      email,
+      password,
+      role,
+    });
+  } catch {
+    redirect("/admin?error=account-create-failed");
+  }
 
   revalidatePath("/admin");
   redirect("/admin?status=account-created");
