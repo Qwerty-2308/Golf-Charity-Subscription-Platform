@@ -48,9 +48,6 @@ export async function POST(request: Request) {
     }
   }
 
-<<<<<<< Current (Your changes)
-  return NextResponse.redirect(new URL("/pricing?error=stripe-checkout-not-configured", env.siteUrl));
-=======
   // If priceId is not preconfigured, fall back to creating the recurring price inline.
   // This still returns a real Stripe Checkout URL (so the user is redirected to Stripe).
   if (stripe) {
@@ -91,5 +88,4 @@ export async function POST(request: Request) {
   // Stripe isn't available (or Checkout URL couldn't be created) => demo fallback.
   activateDemoSubscription(viewer.profile.id, cadence, charityTier);
   return NextResponse.redirect(new URL("/dashboard?checkout=demo-success", env.siteUrl));
->>>>>>> Incoming (Background Agent changes)
 }

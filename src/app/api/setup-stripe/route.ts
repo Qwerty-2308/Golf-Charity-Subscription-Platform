@@ -1,5 +1,3 @@
-<<<<<<< Current (Your changes)
-=======
 import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
 
@@ -78,4 +76,3 @@ export async function GET() {
     return NextResponse.json({ error: message });
   }
 }
->>>>>>> Incoming (Background Agent changes)
