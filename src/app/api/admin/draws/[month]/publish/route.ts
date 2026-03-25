@@ -28,7 +28,7 @@ export async function POST(
       return NextResponse.json(result);
     }
 
-    const result = publishMonthlyDraw({
+    const result = await publishMonthlyDraw({
       actorId: viewer.profile.id,
       monthKey: month,
       mode: (body.mode as DrawMode) ?? "algorithmic",

@@ -35,11 +35,12 @@ export async function loginAction(formData: FormData) {
   const email = getRequiredString(formData, "email");
   const password = getRequiredString(formData, "password");
   const requestedRole = (formData.get("requestedRole") as string | null) ?? "subscriber";
+  const loginPath = requestedRole === "admin" ? "/admin/login" : "/sign-in";
 
   if (isDemoMode()) {
     const profile = authenticateDemoUser(email, password);
     if (!profile) {
-      redirect(requestedRole === "admin" ? "/admin/login?error=invalid-credentials" : "/sign-in?error=invalid-credentials");
+      redirect(`${loginPath}?error=invalid-credentials`);
     }
     if (requestedRole === "admin" && profile.role !== "admin") {
       redirect("/admin/login?error=admin-only-account");
@@ -51,17 +52,17 @@ export async function loginAction(formData: FormData) {
   // Live mode: Supabase email/password sign-in
   const supabase = await createSupabaseServerClient();
   if (!supabase) {
-    redirect("/sign-in?error=server-error");
+    redirect(`${loginPath}?error=server-error`);
   }
 
   const { error } = await supabase.auth.signInWithPassword({ email, password });
   if (error) {
-    redirect("/sign-in?error=invalid-credentials");
+    redirect(`${loginPath}?error=invalid-credentials`);
   }
 
   // Determine role from profiles table
   const { data: { user } } = await supabase.auth.getUser();
-  if (!user) redirect("/sign-in?error=invalid-credentials");
+  if (!user) redirect(`${loginPath}?error=invalid-credentials`);
 
   const { data: profile } = await supabase
     .from("profiles")
@@ -69,12 +70,17 @@ export async function loginAction(formData: FormData) {
     .eq("auth_user_id", user!.id)
     .single();
 
+  if (!profile?.role) {
+    await supabase.auth.signOut();
+    redirect(`${loginPath}?error=profile-not-found`);
+  }
+
   if (requestedRole === "admin" && profile?.role !== "admin") {
     await supabase.auth.signOut();
     redirect("/admin/login?error=admin-only-account");
   }
 
-  redirect(profile?.role === "admin" ? "/admin" : "/dashboard");
+  redirect(profile.role === "admin" ? "/admin" : "/dashboard");
 }
 
 export async function signupAction(formData: FormData) {
@@ -85,13 +91,12 @@ export async function signupAction(formData: FormData) {
   const charityTier = Number(getRequiredString(formData, "charityTier")) as CharityTier;
 
   if (isDemoMode()) {
-    let profile;
     try {
-      profile = createDemoSubscriber({ fullName, email, password, selectedCharityId: charityId, charityTier });
+      const profile = createDemoSubscriber({ fullName, email, password, selectedCharityId: charityId, charityTier });
+      await createDemoSession(profile);
     } catch (error) {
       redirect(`/sign-in?error=${error instanceof Error ? "signup-failed" : "signup-failed"}`);
     }
-    await createDemoSession(profile);
     redirect("/pricing?welcome=1");
   }
 
@@ -118,6 +123,26 @@ export async function signupAction(formData: FormData) {
   }, { onConflict: "auth_user_id" });
 
   redirect("/pricing?welcome=1");
+}
+
+export async function bootstrapFirstAdminAction(formData: FormData) {
+  if (isDemoMode()) {
+    redirect("/admin/login?error=disable-demo-mode-before-admin-bootstrap");
+  }
+
+  const fullName = getRequiredString(formData, "fullName");
+  const email = getRequiredString(formData, "email");
+  const password = getRequiredString(formData, "password");
+
+  try {
+    const { bootstrapFirstAdmin } = await import("@/lib/live-platform");
+    await bootstrapFirstAdmin({ fullName, email, password });
+  } catch (error) {
+    const message = error instanceof Error ? error.message : "bootstrap-failed";
+    redirect(`/admin/bootstrap?error=${encodeURIComponent(message)}`);
+  }
+
+  redirect("/admin/login?status=admin-created");
 }
 
 export async function demoSubscriptionAction(formData: FormData) {
@@ -252,7 +277,7 @@ export async function submitClaimAction(formData: FormData) {
 
   submitWinnerClaim(viewer.profile.id, {
     drawResultId,
-    proofName: proof instanceof File && proof.name ? proof.name : "demo-proof.png",
+    proofName: proof instanceof File && proof.name ? proof.name : "proof.png",
   });
   revalidatePath("/dashboard");
   redirect("/dashboard?status=claim-submitted");
@@ -276,7 +301,7 @@ export async function publishDrawAction(formData: FormData) {
     redirect("/admin?status=draw-published");
   }
   try {
-    publishMonthlyDraw({
+    await publishMonthlyDraw({
       actorId: viewer.profile.id,
       monthKey: getRequiredString(formData, "monthKey"),
       mode: getRequiredString(formData, "mode") as DrawMode,

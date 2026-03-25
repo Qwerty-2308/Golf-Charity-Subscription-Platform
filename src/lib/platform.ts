@@ -1,6 +1,6 @@
 import { seededCurrentMonth } from "@/lib/demo-data";
 import { getDemoStore, mutateDemoStore } from "@/lib/demo-store";
-import { isDemoMode } from "@/lib/env";
+import { hasSupabaseConfig, isDemoMode } from "@/lib/env";
 import { simulateDrawSummary } from "@/lib/logic/draws";
 import { buildDashboardKpis } from "@/lib/logic/reports";
 import { sortScoresDescending, upsertUserScore } from "@/lib/logic/scores";
@@ -12,7 +12,6 @@ import type {
   ClaimStatus,
   DrawMode,
   FrequencyBias,
-  MonthlyDrawSummary,
   PlanCadence,
   Profile,
   ScoreEntry,
@@ -20,6 +19,20 @@ import type {
   ViewerContext,
   WinnerClaim,
 } from "@/lib/types";
+
+const emptyKpis = {
+  activeSubscribers: 0,
+  totalPrizePoolCents: 0,
+  totalCharityCents: 0,
+  pendingClaims: 0,
+  rolloverCents: 0,
+};
+
+function ensureLiveConfig(action: string) {
+  if (!hasSupabaseConfig()) {
+    throw new Error(`${action} requires a configured Supabase project.`);
+  }
+}
 
 function getPlanPrice(subscriptionBaseCents: number, tier: CharityTier) {
   const uplift = Math.max(0, tier - 10);
@@ -72,6 +85,9 @@ function getCharityTotalsForMonth(monthKey: string) {
 
 export async function getHomeSnapshot() {
   if (!isDemoMode()) {
+    if (!hasSupabaseConfig()) {
+      return { featuredCharity: undefined, charities: [], plans: [], kpis: emptyKpis, currentMonth: toMonthKey() };
+    }
     const { getLiveHomeSnapshot } = await import("@/lib/live-platform");
     return getLiveHomeSnapshot();
   }
@@ -94,6 +110,9 @@ export async function getHomeSnapshot() {
 
 export async function getCharityDirectorySnapshot() {
   if (!isDemoMode()) {
+    if (!hasSupabaseConfig()) {
+      return { charities: [], categories: [] };
+    }
     const { getLiveCharityDirectory } = await import("@/lib/live-platform");
     return getLiveCharityDirectory();
   }
@@ -106,6 +125,9 @@ export async function getCharityDirectorySnapshot() {
 
 export async function getCharityPageSnapshot(slug: string) {
   if (!isDemoMode()) {
+    if (!hasSupabaseConfig()) {
+      return null;
+    }
     const { getLiveCharityPage } = await import("@/lib/live-platform");
     return getLiveCharityPage(slug);
   }
@@ -164,7 +186,7 @@ export function createDemoSubscriber(input: {
       targetType: "profile",
       targetId: id,
       createdAt: new Date().toISOString(),
-      summary: "Created a demo subscriber account.",
+      summary: "Created a subscriber account.",
     });
 
     return profile;
@@ -215,6 +237,7 @@ export function createDemoAdminAccount(input: {
 
 export async function getDashboardSnapshot(viewer: ViewerContext) {
   if (!isDemoMode()) {
+    ensureLiveConfig("Dashboard access");
     const { getLiveDashboardSnapshot } = await import("@/lib/live-platform");
     return getLiveDashboardSnapshot(viewer);
   }
@@ -252,6 +275,7 @@ export async function getDashboardSnapshot(viewer: ViewerContext) {
 
 export async function getAdminSnapshot() {
   if (!isDemoMode()) {
+    ensureLiveConfig("Admin access");
     const { getLiveAdminSnapshot } = await import("@/lib/live-platform");
     return getLiveAdminSnapshot();
   }
@@ -300,6 +324,7 @@ export async function getAdminSnapshot() {
 
 export async function saveUserScore(userId: string, input: { score: number; playedAt: string; id?: string }) {
   if (!isDemoMode()) {
+    ensureLiveConfig("Saving scores");
     const { saveLiveScore } = await import("@/lib/live-platform");
     return saveLiveScore(userId, input);
   }
@@ -325,6 +350,7 @@ export async function saveUserScore(userId: string, input: { score: number; play
 
 export async function deleteUserScore(userId: string, scoreId: string) {
   if (!isDemoMode()) {
+    ensureLiveConfig("Deleting scores");
     const { deleteLiveScore } = await import("@/lib/live-platform");
     return deleteLiveScore(userId, scoreId);
   }
@@ -335,6 +361,7 @@ export async function deleteUserScore(userId: string, scoreId: string) {
 
 export async function updateUserPreferences(userId: string, input: { charityId: string; charityTier: CharityTier }) {
   if (!isDemoMode()) {
+    ensureLiveConfig("Updating membership preferences");
     const { updateLivePreferences } = await import("@/lib/live-platform");
     return updateLivePreferences(userId, input);
   }
@@ -403,6 +430,12 @@ export function activateDemoSubscription(userId: string, cadence: PlanCadence, t
 }
 
 export async function recordIndependentDonation(userId: string, charityId: string, amountCents: number) {
+  if (!isDemoMode()) {
+    ensureLiveConfig("Recording donations");
+    const { recordLiveDonation } = await import("@/lib/live-platform");
+    return recordLiveDonation(userId, charityId, amountCents);
+  }
+
   mutateDemoStore((store) => {
     store.donationLedger.push({
       id: `donation-${Math.random().toString(36).slice(2, 10)}`,
@@ -432,11 +465,17 @@ export async function recordIndependentDonation(userId: string, charityId: strin
   }
 }
 
-export function simulateMonthlyDraw(input: {
+export async function simulateMonthlyDraw(input: {
   monthKey?: string;
   mode: DrawMode;
   bias?: FrequencyBias;
-}): MonthlyDrawSummary {
+}) {
+  if (!isDemoMode()) {
+    ensureLiveConfig("Draw simulation");
+    const { simulateLiveDraw } = await import("@/lib/live-platform");
+    return simulateLiveDraw(input);
+  }
+
   const store = getDemoStore();
   const monthKey = input.monthKey ?? seededCurrentMonth;
   return simulateDrawSummary({
@@ -452,25 +491,36 @@ export function simulateMonthlyDraw(input: {
   });
 }
 
-export function publishMonthlyDraw(input: {
+export async function publishMonthlyDraw(input: {
   monthKey?: string;
   mode: DrawMode;
   bias?: FrequencyBias;
   actorId: string;
 }) {
+  if (!isDemoMode()) {
+    ensureLiveConfig("Publishing draws");
+    const { publishLiveDraw } = await import("@/lib/live-platform");
+    return publishLiveDraw({
+      actorId: input.actorId,
+      monthKey: input.monthKey ?? toMonthKey(),
+      mode: input.mode,
+      bias: input.bias,
+    });
+  }
+
+  const monthKey = input.monthKey ?? toMonthKey();
+  const summary = await simulateMonthlyDraw({
+    monthKey,
+    mode: input.mode,
+    bias: input.bias,
+  });
+
   return mutateDemoStore((store) => {
-    const monthKey = input.monthKey ?? toMonthKey();
     const existing = store.monthlyDraws.find((draw) => draw.monthKey === monthKey && !draw.simulationOnly);
 
     if (existing) {
       throw new Error("That month has already been published.");
     }
-
-    const summary = simulateMonthlyDraw({
-      monthKey,
-      mode: input.mode,
-      bias: input.bias,
-    });
     const drawId = `draw-${monthKey}`;
     const draw = {
       ...summary.draw,
@@ -508,6 +558,10 @@ export function publishMonthlyDraw(input: {
 }
 
 export function submitWinnerClaim(userId: string, input: { drawResultId: string; proofName: string }) {
+  if (!isDemoMode()) {
+    throw new Error("Winner claims must be submitted through the live upload flow.");
+  }
+
   return mutateDemoStore((store) => {
     const result = store.drawResults.find((candidate) => candidate.id === input.drawResultId && candidate.userId === userId);
     if (!result) {
@@ -544,6 +598,12 @@ export async function reviewWinnerClaim(input: {
   note?: string;
   actorId: string;
 }) {
+  if (!isDemoMode()) {
+    ensureLiveConfig("Reviewing claims");
+    const { reviewLiveClaim } = await import("@/lib/live-platform");
+    return reviewLiveClaim(input);
+  }
+
   const store = getDemoStore();
   const claim = store.winnerClaims.find((candidate) => candidate.id === input.claimId);
 
@@ -597,7 +657,13 @@ export async function reviewWinnerClaim(input: {
   return claim;
 }
 
-export function resyncSubscription(subscriptionId: string) {
+export async function resyncSubscription(subscriptionId: string) {
+  if (!isDemoMode()) {
+    ensureLiveConfig("Resyncing subscriptions");
+    const { resyncLiveSubscription } = await import("@/lib/live-platform");
+    return resyncLiveSubscription(subscriptionId);
+  }
+
   return mutateDemoStore((store) => {
     const subscription = store.subscriptions.find((candidate) => candidate.id === subscriptionId);
     if (!subscription) {
@@ -610,7 +676,16 @@ export function resyncSubscription(subscriptionId: string) {
   });
 }
 
-export function buildAdminCsv() {
+export async function buildAdminCsv() {
+  if (!isDemoMode()) {
+    if (!hasSupabaseConfig()) {
+      return "email,role,subscription_status,charity,tier,latest_score_count";
+    }
+
+    const { buildLiveAdminCsv } = await import("@/lib/live-platform");
+    return buildLiveAdminCsv();
+  }
+
   const store = getDemoStore();
   const rows = [
     ["email", "role", "subscription_status", "charity", "tier", "latest_score_count"].join(","),
@@ -634,7 +709,23 @@ export function buildAdminCsv() {
   return rows.join("\n");
 }
 
-export function getAvailablePlanCards() {
+export async function getAvailablePlanCards() {
+  if (!isDemoMode()) {
+    if (!hasSupabaseConfig()) {
+      return [];
+    }
+
+    const { getLivePlans } = await import("@/lib/live-platform");
+    const plans = await getLivePlans();
+    return plans.map((plan) => ({
+      ...plan,
+      tiers: plan.enabledTiers.map((tier) => ({
+        tier,
+        priceCents: getPlanPrice(plan.baseAmountCents, tier),
+      })),
+    }));
+  }
+
   const store = getDemoStore();
   return store.plans.map((plan) => ({
     ...plan,
@@ -647,6 +738,9 @@ export function getAvailablePlanCards() {
 
 export async function getAvailableCharities(): Promise<Charity[]> {
   if (!isDemoMode()) {
+    if (!hasSupabaseConfig()) {
+      return [];
+    }
     const { getLiveAvailableCharities } = await import("@/lib/live-platform");
     return getLiveAvailableCharities();
   }
@@ -662,6 +756,7 @@ export async function createCharity(input: {
   mission: string;
 }) {
   if (!isDemoMode()) {
+    ensureLiveConfig("Creating charities");
     const { createLiveCharity } = await import("@/lib/live-platform");
     return createLiveCharity(input);
   }
@@ -670,33 +765,39 @@ export async function createCharity(input: {
 
 export async function toggleCharityStatus(charityId: string, active: boolean) {
   if (!isDemoMode()) {
+    ensureLiveConfig("Updating charity status");
     const { toggleLiveCharityStatus } = await import("@/lib/live-platform");
     return toggleLiveCharityStatus(charityId, active);
   }
   // No-op for demo mode unless specifically handled
 }
 
-export function getDemoCredentials() {
-  return {
-    user: {
-      email: "player@gooddrive.club",
-      password: "Player@2026",
-    },
-    admin: {
-      email: "admin@gooddrive.club",
-      password: "Admin@2026",
-    },
-  };
-}
-
 export function getUserById(userId: string) {
   return getProfile(userId);
 }
 
-export function getSubscriberSubscription(userId: string): SubscriptionRecord | undefined {
+export async function getSubscriberSubscription(userId: string): Promise<SubscriptionRecord | undefined> {
+  if (!isDemoMode()) {
+    if (!hasSupabaseConfig()) {
+      return undefined;
+    }
+
+    const { getLiveSubscriberSubscription } = await import("@/lib/live-platform");
+    return getLiveSubscriberSubscription(userId);
+  }
+
   return getSubscription(userId);
 }
 
-export function getSubscriberScores(userId: string): ScoreEntry[] {
+export async function getSubscriberScores(userId: string): Promise<ScoreEntry[]> {
+  if (!isDemoMode()) {
+    if (!hasSupabaseConfig()) {
+      return [];
+    }
+
+    const { getLiveSubscriberScores } = await import("@/lib/live-platform");
+    return getLiveSubscriberScores(userId);
+  }
+
   return getRollingFive(userId);
 }

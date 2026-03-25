@@ -1,7 +1,6 @@
 import Link from "next/link";
 import {
   deleteScoreAction,
-  demoSubscriptionAction,
   saveScoreAction,
   submitClaimAction,
   updatePreferencesAction,
@@ -9,7 +8,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { buttonStyles } from "@/components/ui/button";
 import { Card } from "@/components/ui/card";
-import { isDemoMode } from "@/lib/env";
 import { getAvailableCharities, getDashboardSnapshot } from "@/lib/platform";
 import { requireViewer } from "@/lib/session";
 import { formatCurrency, formatDate, formatMonthLabel } from "@/lib/utils";
@@ -18,7 +16,6 @@ export default async function DashboardPage() {
   const viewer = await requireViewer();
   const snapshot = await getDashboardSnapshot(viewer);
   const charities = await getAvailableCharities();
-  const demoMode = isDemoMode();
 
   return (
     <div className="section-shell space-y-8 py-14 md:py-20">
@@ -60,34 +57,9 @@ export default async function DashboardPage() {
           <p className="text-sm leading-7 text-muted">
             Your account still has dashboard visibility, but score entry, draw participation, and claim submission stay locked until billing is active again.
           </p>
-          {demoMode ? (
-            <form action={demoSubscriptionAction} className="grid gap-4 md:grid-cols-[1fr_1fr_auto]">
-              <label className="grid gap-2 text-sm font-medium">
-                Plan cadence
-                <select name="cadence" className="h-12 rounded-2xl border border-line bg-white px-4 outline-none">
-                  <option value="monthly">Monthly</option>
-                  <option value="yearly">Yearly</option>
-                </select>
-              </label>
-              <label className="grid gap-2 text-sm font-medium">
-                Charity tier
-                <select name="charityTier" defaultValue={String(viewer.profile.charityTier)} className="h-12 rounded-2xl border border-line bg-white px-4 outline-none">
-                  {[10, 15, 20, 25, 30].map((tier) => (
-                    <option key={tier} value={tier}>
-                      {tier}%
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <button className="mt-auto h-12 rounded-full bg-primary px-6 font-medium text-white">
-                Reactivate
-              </button>
-            </form>
-          ) : (
-            <Link href="/pricing" className={buttonStyles({ variant: "primary", size: "md" })}>
-              Go to pricing to reactivate
-            </Link>
-          )}
+          <Link href="/pricing" className={buttonStyles({ variant: "primary", size: "md" })}>
+            Go to pricing to reactivate
+          </Link>
         </Card>
       ) : null}
 
@@ -167,6 +139,11 @@ export default async function DashboardPage() {
         <div className="space-y-6">
           <Card className="space-y-5">
             <h2 className="display-font text-3xl font-semibold">Membership settings</h2>
+            {charities.length === 0 ? (
+              <div className="rounded-[1.5rem] bg-white/75 p-4 text-sm text-muted">
+                No active charities are configured yet. An admin needs to add one before charity preferences can be updated.
+              </div>
+            ) : null}
             <form action={updatePreferencesAction} className="grid gap-4">
               <label className="grid gap-2 text-sm font-medium">
                 Selected charity
@@ -174,6 +151,7 @@ export default async function DashboardPage() {
                   name="charityId"
                   defaultValue={viewer.profile.selectedCharityId}
                   className="h-12 rounded-2xl border border-line bg-white px-4 outline-none"
+                  disabled={charities.length === 0}
                 >
                   {charities.map((charity) => (
                     <option key={charity.id} value={charity.id}>
@@ -188,6 +166,7 @@ export default async function DashboardPage() {
                   name="charityTier"
                   defaultValue={String(viewer.profile.charityTier)}
                   className="h-12 rounded-2xl border border-line bg-white px-4 outline-none"
+                  disabled={charities.length === 0}
                 >
                   {[10, 15, 20, 25, 30].map((tier) => (
                     <option key={tier} value={tier}>
@@ -196,7 +175,7 @@ export default async function DashboardPage() {
                   ))}
                 </select>
               </label>
-              <button className="h-12 rounded-full bg-primary font-medium text-white">
+              <button disabled={charities.length === 0} className="h-12 rounded-full bg-primary font-medium text-white disabled:cursor-not-allowed disabled:opacity-40">
                 Save preferences
               </button>
             </form>

@@ -108,6 +108,11 @@ export function CharityDirectory({
             </Link>
           </Card>
         ))}
+        {filtered.length === 0 ? (
+          <Card className="border border-line bg-white/80 p-6 text-sm text-muted lg:col-span-2">
+            No charities match the current filters yet.
+          </Card>
+        ) : null}
       </div>
     </div>
   );

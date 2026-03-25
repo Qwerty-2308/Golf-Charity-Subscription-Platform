@@ -1,9 +1,6 @@
 import Link from "next/link";
-import { getDemoCredentials } from "@/lib/platform";
 
 export function SiteFooter() {
-  const credentials = getDemoCredentials();
-
   return (
     <footer className="border-t border-line/60 bg-white/60">
       <div className="section-shell grid gap-10 py-10 md:grid-cols-[1.2fr_0.8fr_0.8fr]">
@@ -29,9 +26,16 @@ export function SiteFooter() {
           </Link>
         </div>
         <div className="space-y-3 text-sm text-muted">
-          <p className="font-semibold uppercase tracking-[0.22em] text-foreground">Demo Access</p>
-          <p>User: {credentials.user.email} / {credentials.user.password}</p>
-          <p>Admin: {credentials.admin.email} / {credentials.admin.password}</p>
+          <p className="font-semibold uppercase tracking-[0.22em] text-foreground">Operations</p>
+          <Link href="/sign-in" className="block hover:text-foreground">
+            Member sign in
+          </Link>
+          <Link href="/admin/login" className="block hover:text-foreground">
+            Admin sign in
+          </Link>
+          <Link href="/admin/bootstrap" className="block hover:text-foreground">
+            First admin bootstrap
+          </Link>
         </div>
       </div>
     </footer>

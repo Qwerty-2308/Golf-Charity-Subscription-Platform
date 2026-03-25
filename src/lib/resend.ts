@@ -23,7 +23,7 @@ export async function sendTransactionalEmail(args: {
   const client = getResend();
 
   if (!client) {
-    return { delivered: false, mode: "demo" as const };
+    return { delivered: false, mode: "skipped" as const };
   }
 
   await client.emails.send({

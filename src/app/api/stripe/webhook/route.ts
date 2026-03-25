@@ -1,4 +1,5 @@
 import { NextResponse } from "next/server";
+import type Stripe from "stripe";
 import { env } from "@/lib/env";
 import { getStripeServer } from "@/lib/stripe";
 import { createSupabaseAdminClient } from "@/lib/supabase/server-admin";
@@ -10,10 +11,13 @@ export async function POST(request: Request) {
   const body = await request.text();
 
   if (!stripe || !env.stripeWebhookSecret || !signature) {
-    return NextResponse.json({ received: true, mode: "demo" });
+    return NextResponse.json(
+      { received: false, error: "Stripe webhook is not configured." },
+      { status: 400 },
+    );
   }
 
-  let event;
+  let event: Stripe.Event;
   try {
     event = stripe.webhooks.constructEvent(body, signature, env.stripeWebhookSecret);
   } catch (error) {

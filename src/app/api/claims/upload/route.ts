@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { env, isDemoMode } from "@/lib/env";
+import { env } from "@/lib/env";
 import { getCurrentViewer } from "@/lib/session";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
@@ -30,11 +30,6 @@ export async function POST(request: Request) {
 
   if (file.size > MAX_SIZE_BYTES) {
     return NextResponse.json({ error: "File too large. Maximum 5 MB." }, { status: 400 });
-  }
-
-  // Demo mode: accept and record with a placeholder path
-  if (isDemoMode()) {
-    return NextResponse.json({ proofPath: `demo://${file.name}` });
   }
 
   const supabase = await createSupabaseServerClient();

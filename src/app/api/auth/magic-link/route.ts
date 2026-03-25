@@ -1,5 +1,5 @@
 import { NextResponse } from "next/server";
-import { env, isDemoMode } from "@/lib/env";
+import { env } from "@/lib/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export async function POST(request: Request) {
@@ -10,13 +10,9 @@ export async function POST(request: Request) {
     return NextResponse.redirect(new URL("/sign-in?error=missing-email", env.siteUrl));
   }
 
-  if (isDemoMode()) {
-    return NextResponse.redirect(new URL("/sign-in?info=magic-link-is-available-after-live-supabase-setup", env.siteUrl));
-  }
-
   const supabase = await createSupabaseServerClient();
   if (!supabase) {
-    return NextResponse.redirect(new URL("/sign-in?error=server-error", env.siteUrl));
+    return NextResponse.redirect(new URL("/sign-in?error=supabase-auth-not-configured", env.siteUrl));
   }
 
   const { error } = await supabase.auth.signInWithOtp({

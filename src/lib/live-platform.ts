@@ -25,7 +25,6 @@ import type {
   DrawResult,
   FrequencyBias,
   MonthlyDraw,
-  MonthlyDrawSummary,
   Plan,
   Profile,
   ScoreEntry,
@@ -178,6 +177,87 @@ async function getSupabase() {
   return client;
 }
 
+async function buildLiveDrawSummary(input: {
+  monthKey: string;
+  mode: DrawMode;
+  bias?: FrequencyBias;
+}) {
+  const supabase = await getSupabase();
+
+  const [{ data: subsRows }, { data: planRows }, { data: profileRows }, { data: scoreRows }] =
+    await Promise.all([
+      supabase.from("subscriptions").select("*").eq("status", "active"),
+      supabase.from("plans").select("*"),
+      supabase.from("profiles").select("*").eq("role", "subscriber"),
+      supabase.from("score_entries").select("*"),
+    ]);
+
+  const subscriptions = (subsRows ?? []).map((row) => mapSubscription(row as Record<string, unknown>));
+  const plans = (planRows ?? []).map((row) => mapPlan(row as Record<string, unknown>));
+  const profiles = (profileRows ?? []).map((row) => mapProfile(row as Record<string, unknown>));
+  const scores = (scoreRows ?? []).map((row) => mapScore(row as Record<string, unknown>));
+
+  const monthStart = `${input.monthKey}-01`;
+  const monthBoundary = new Date(`${monthStart}T00:00:00.000Z`);
+  const nextMonthBoundary = new Date(monthBoundary);
+  nextMonthBoundary.setUTCMonth(nextMonthBoundary.getUTCMonth() + 1);
+
+  const [{ data: ledgerRows }, { data: donationRows }] = await Promise.all([
+    supabase
+      .from("charity_ledger")
+      .select("amount_cents")
+      .gte("recorded_at", monthBoundary.toISOString())
+      .lt("recorded_at", nextMonthBoundary.toISOString()),
+    supabase
+      .from("donation_ledger")
+      .select("amount_cents")
+      .gte("recorded_at", monthBoundary.toISOString())
+      .lt("recorded_at", nextMonthBoundary.toISOString()),
+  ]);
+
+  const charityTotalCents = [...(ledgerRows ?? []), ...(donationRows ?? [])].reduce(
+    (sum, row) => sum + ((row.amount_cents as number) ?? 0),
+    0,
+  );
+
+  const { data: previousDrawRow } = await supabase
+    .from("monthly_draws")
+    .select("id, five_match_pool_cents, month_key")
+    .eq("simulation_only", false)
+    .not("published_at", "is", null)
+    .lt("month_key", monthBoundary.toISOString().slice(0, 10))
+    .order("month_key", { ascending: false })
+    .limit(1)
+    .maybeSingle();
+
+  let rolloverFromPreviousCents = 0;
+  if (previousDrawRow?.id) {
+    const { count } = await supabase
+      .from("draw_results")
+      .select("id", { count: "exact", head: true })
+      .eq("draw_id", previousDrawRow.id as string)
+      .eq("tier", "five_match");
+
+    if (!count || count === 0) {
+      rolloverFromPreviousCents = (previousDrawRow.five_match_pool_cents as number) ?? 0;
+    }
+  }
+
+  const summary = simulateDrawSummary({
+    monthKey: input.monthKey,
+    mode: input.mode,
+    bias: input.bias,
+    subscriptions,
+    plans,
+    profiles,
+    scores,
+    charityTotalCents,
+    rolloverFromPreviousCents,
+  });
+
+  return { supabase, summary, charityTotalCents, rolloverFromPreviousCents };
+}
+
 // ---------------------------------------------------------------------------
 // Dashboard snapshot
 // ---------------------------------------------------------------------------
@@ -280,7 +360,7 @@ export async function getLiveAdminSnapshot() {
   ] = await Promise.all([
     supabase.from("subscriptions").select("*"),
     supabase.from("profiles").select("*"),
-    supabase.from("winner_claims").select("*, draw_results(*, profiles(*))").order("created_at", { ascending: false }),
+    supabase.from("winner_claims").select("*").order("created_at", { ascending: false }),
     supabase.from("charities").select("*"),
     supabase.from("plans").select("*"),
     supabase.from("audit_logs").select("*").order("created_at", { ascending: false }).limit(8),
@@ -297,6 +377,16 @@ export async function getLiveAdminSnapshot() {
   const charities = (charityRows ?? []).map((r) => mapCharity(r as Record<string, unknown>));
   const allScores = (scoreRows ?? []).map((r) => mapScore(r as Record<string, unknown>));
   const draws = (drawRows ?? []).map((r) => mapDraw(r as Record<string, unknown>));
+  const claims = (claimRows ?? []).map((row) => mapClaim(row as Record<string, unknown>));
+
+  const claimResultIds = claims.map((claim) => claim.drawResultId);
+  const { data: claimResultRows } = claimResultIds.length
+    ? await supabase.from("draw_results").select("*").in("id", claimResultIds)
+    : { data: [] };
+
+  const claimResults = (claimResultRows ?? []).map((row) => mapDrawResult(row as Record<string, unknown>));
+  const claimResultMap = new Map(claimResults.map((result) => [result.id, result]));
+  const profileMap = new Map(profiles.map((profile) => [profile.id, profile]));
 
   const kpis: DashboardKpis = buildDashboardKpis({
     subscriptions,
@@ -324,7 +414,7 @@ export async function getLiveAdminSnapshot() {
       status: r.status as "pending" | "paid",
       recordedAt: r.recorded_at as string,
     })),
-    claims: (claimRows ?? []).map((row) => mapClaim(row as Record<string, unknown>)),
+    claims,
   });
 
   const getRollingFive = (userId: string) =>
@@ -343,19 +433,16 @@ export async function getLiveAdminSnapshot() {
       profile,
     }));
 
-  const claims = (claimRows ?? []).map((row) => {
-    const claim = mapClaim(row as Record<string, unknown>);
-    const resultRow = row.draw_results as Record<string, unknown> | null;
-    const result = resultRow ? mapDrawResult(resultRow) : undefined;
-    const profileRow = resultRow?.profiles as Record<string, unknown> | null;
-    const user = profileRow ? mapProfile(profileRow) : undefined;
+  const claimEntries = claims.map((claim) => {
+    const result = claimResultMap.get(claim.drawResultId);
+    const user = profileMap.get(claim.userId) ?? (result ? profileMap.get(result.userId) : undefined);
     return { claim, result, user };
   });
 
   const latestDraw = draws[0];
   const audits = (auditRows ?? []).map((r) => mapAudit(r as Record<string, unknown>));
 
-  return { kpis, users, admins, claims, latestDraw, charities, plans, audits };
+  return { kpis, users, admins, claims: claimEntries, latestDraw, charities, plans, audits };
 }
 
 // ---------------------------------------------------------------------------
@@ -487,72 +574,28 @@ export async function submitLiveClaim(
 // Admin: draw publish
 // ---------------------------------------------------------------------------
 
+export async function simulateLiveDraw(input: {
+  monthKey?: string;
+  mode: DrawMode;
+  bias?: FrequencyBias;
+}) {
+  const monthKey = input.monthKey ?? new Date().toISOString().slice(0, 7);
+  const { summary } = await buildLiveDrawSummary({
+    monthKey,
+    mode: input.mode,
+    bias: input.bias,
+  });
+
+  return summary;
+}
+
 export async function publishLiveDraw(input: {
   monthKey: string;
   mode: DrawMode;
   bias?: FrequencyBias;
   actorId: string;
 }) {
-  const supabase = await getSupabase();
-
-  // Get all data needed for simulation
-  const [{ data: subsRows }, { data: planRows }, { data: profileRows }, { data: scoreRows }] =
-    await Promise.all([
-      supabase.from("subscriptions").select("*").eq("status", "active"),
-      supabase.from("plans").select("*"),
-      supabase.from("profiles").select("*").eq("role", "subscriber"),
-      supabase.from("score_entries").select("*"),
-    ]);
-
-  const subscriptions = (subsRows ?? []).map((r) => mapSubscription(r as Record<string, unknown>));
-  const plans = (planRows ?? []).map((r) => mapPlan(r as Record<string, unknown>));
-  const profiles = (profileRows ?? []).map((r) => mapProfile(r as Record<string, unknown>));
-  const scores = (scoreRows ?? []).map((r) => mapScore(r as Record<string, unknown>));
-
-  // Get charity totals for the month
-  const monthStart = `${input.monthKey}-01`;
-  const [{ data: ledgerRows }, { data: donationRows }] = await Promise.all([
-    supabase.from("charity_ledger").select("amount_cents").gte("recorded_at", monthStart),
-    supabase.from("donation_ledger").select("amount_cents").gte("recorded_at", monthStart),
-  ]);
-  const charityTotalCents = [
-    ...(ledgerRows ?? []),
-    ...(donationRows ?? []),
-  ].reduce((sum, r) => sum + (r.amount_cents as number), 0);
-
-  // Get rollover from previous published draw
-  const { data: prevDrawRow } = await supabase
-    .from("monthly_draws")
-    .select("id, five_match_pool_cents, month_key")
-    .eq("simulation_only", false)
-    .not("published_at", "is", null)
-    .order("month_key", { ascending: false })
-    .limit(1)
-    .maybeSingle();
-
-  let rolloverFromPreviousCents = 0;
-  if (prevDrawRow && prevDrawRow.month_key !== `${input.monthKey}-01`) {
-    const { count } = await supabase
-      .from("draw_results")
-      .select("id", { count: "exact", head: true })
-      .eq("draw_id", prevDrawRow.id as string)
-      .eq("tier", "five_match");
-    if (!count || count === 0) {
-      rolloverFromPreviousCents = (prevDrawRow.five_match_pool_cents as number) ?? 0;
-    }
-  }
-
-  const summary: MonthlyDrawSummary = simulateDrawSummary({
-    monthKey: input.monthKey,
-    mode: input.mode,
-    bias: input.bias,
-    subscriptions,
-    plans,
-    profiles,
-    scores,
-    charityTotalCents,
-    rolloverFromPreviousCents,
-  });
+  const { supabase, summary, charityTotalCents, rolloverFromPreviousCents } = await buildLiveDrawSummary(input);
 
   // Insert draw row
   const { data: drawRow } = await supabase
@@ -752,6 +795,25 @@ export async function getLivePlans(): Promise<Plan[]> {
   return (data ?? []).map((r) => mapPlan(r as Record<string, unknown>));
 }
 
+export async function getLiveSubscriberSubscription(userId: string) {
+  const supabase = await getSupabase();
+  const { data } = await supabase.from("subscriptions").select("*").eq("user_id", userId).maybeSingle();
+  return data ? mapSubscription(data as Record<string, unknown>) : undefined;
+}
+
+export async function getLiveSubscriberScores(userId: string) {
+  const supabase = await getSupabase();
+  const { data } = await supabase
+    .from("score_entries")
+    .select("*")
+    .eq("user_id", userId)
+    .order("played_at", { ascending: false })
+    .order("created_at", { ascending: false })
+    .limit(5);
+
+  return (data ?? []).map((row) => mapScore(row as Record<string, unknown>));
+}
+
 // ---------------------------------------------------------------------------
 // Live home snapshot
 // ---------------------------------------------------------------------------
@@ -815,20 +877,7 @@ export async function getLiveHomeSnapshot() {
     claims: [],
   });
 
-  const featuredCharity = charities.find((c) => c.featured) ?? charities[0] ?? {
-    id: "empty",
-    slug: "empty",
-    name: "No charities found",
-    category: "System",
-    impactTag: "Awaiting database seed",
-    description: "Please run the seed script in your Supabase SQL editor to populate charities.",
-    mission: "",
-    featured: false,
-    images: [],
-    upcomingEvents: [],
-    totalRaisedCents: 0,
-    active: false,
-  };
+  const featuredCharity = charities.find((c) => c.featured) ?? charities[0];
   const plansWithPrices = plans.map((plan) => ({
     ...plan,
     previewPriceCents: getPlanPrice(plan.baseAmountCents, plan.baseCharityPercent),
@@ -842,6 +891,101 @@ export async function getLiveHomeSnapshot() {
     kpis,
     currentMonth,
   };
+}
+
+export async function buildLiveAdminCsv() {
+  const snapshot = await getLiveAdminSnapshot();
+  const rows = [
+    ["email", "role", "subscription_status", "charity", "tier", "latest_score_count"].join(","),
+    ...snapshot.users.map((user) => {
+      const charity = snapshot.charities.find((item) => item.id === user.profile.selectedCharityId);
+      return [
+        user.profile.email,
+        user.profile.role,
+        user.subscription?.status ?? "inactive",
+        charity?.name ?? "",
+        String(user.profile.charityTier),
+        String(user.scores.length),
+      ].join(",");
+    }),
+  ];
+
+  return rows.join("\n");
+}
+
+export async function getAdminBootstrapState() {
+  const supabase = createSupabaseAdminClient();
+  if (!supabase) {
+    return { configured: false, hasAdmin: false };
+  }
+
+  const { count } = await supabase
+    .from("profiles")
+    .select("id", { count: "exact", head: true })
+    .eq("role", "admin");
+
+  return {
+    configured: true,
+    hasAdmin: Boolean(count && count > 0),
+  };
+}
+
+export async function bootstrapFirstAdmin(input: {
+  fullName: string;
+  email: string;
+  password: string;
+}) {
+  const supabase = createSupabaseAdminClient();
+  if (!supabase) {
+    throw new Error("Supabase admin access is not configured.");
+  }
+
+  const state = await getAdminBootstrapState();
+  if (state.hasAdmin) {
+    throw new Error("An admin account already exists.");
+  }
+
+  const { data: created, error } = await supabase.auth.admin.createUser({
+    email: input.email,
+    password: input.password,
+    email_confirm: true,
+    user_metadata: {
+      full_name: input.fullName,
+      country_code: "IN",
+      currency_code: "INR",
+    },
+  });
+
+  if (error || !created.user) {
+    throw new Error(error?.message ?? "Failed to create the first admin account.");
+  }
+
+  const { data: charity } = await supabase
+    .from("charities")
+    .select("id")
+    .eq("active", true)
+    .limit(1)
+    .maybeSingle();
+
+  const { error: profileError } = await supabase.from("profiles").upsert(
+    {
+      auth_user_id: created.user.id,
+      full_name: input.fullName,
+      email: input.email.toLowerCase(),
+      role: "admin",
+      selected_charity_id: charity?.id ?? null,
+      charity_tier: "10",
+      country_code: "IN",
+      currency_code: "INR",
+    },
+    { onConflict: "auth_user_id" },
+  );
+
+  if (profileError) {
+    throw new Error(profileError.message);
+  }
+
+  return created.user;
 }
 
 export async function createLiveCharity(input: {

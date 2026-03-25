@@ -1,6 +1,5 @@
 import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
-import { activateDemoSubscription } from "@/lib/platform";
 import { getCurrentViewer } from "@/lib/session";
 import { resolveStripePriceId, getStripeServer } from "@/lib/stripe";
 import type { CharityTier, PlanCadence } from "@/lib/types";
@@ -39,6 +38,5 @@ export async function POST(request: Request) {
     }
   }
 
-  activateDemoSubscription(viewer.profile.id, cadence, charityTier);
-  return NextResponse.redirect(new URL("/dashboard?checkout=demo-success", env.siteUrl));
+  return NextResponse.redirect(new URL("/pricing?error=stripe-checkout-not-configured", env.siteUrl));
 }

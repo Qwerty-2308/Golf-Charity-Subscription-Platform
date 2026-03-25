@@ -14,7 +14,7 @@ export async function POST(
 
   const { month } = await params;
   const body = await request.json().catch(() => ({}));
-  const summary = simulateMonthlyDraw({
+  const summary = await simulateMonthlyDraw({
     monthKey: month,
     mode: (body.mode as DrawMode) ?? "algorithmic",
     bias: (body.bias as FrequencyBias) ?? "most_frequent",

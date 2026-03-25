@@ -13,7 +13,7 @@ export async function POST(
 
   try {
     const { id } = await params;
-    const subscription = resyncSubscription(id);
+    const subscription = await resyncSubscription(id);
     return NextResponse.json(subscription);
   } catch (error) {
     return NextResponse.json(

@@ -1,4 +1,3 @@
-import Link from "next/link";
 import { loginAction, signupAction } from "@/app/actions";
 import { SectionHeading } from "@/components/section-heading";
 import { Card } from "@/components/ui/card";
@@ -17,7 +16,7 @@ export default async function SignInPage({
       <SectionHeading
         eyebrow="Access"
         title="Sign in to your account."
-        description="Access your dashboard or create a new subscriber account."
+        description="Use the member login for subscribers, or create a new subscriber account if charities have already been configured."
       />
       {params.error ? (
         <Card className="mx-auto max-w-4xl border border-danger/30 bg-danger/8 text-sm text-danger">
@@ -29,13 +28,19 @@ export default async function SignInPage({
           {params.info.replaceAll("-", " ")}.
         </Card>
       ) : null}
-      
+
+      {charities.length === 0 ? (
+        <Card className="mx-auto max-w-4xl border border-warning/30 bg-warning/10 text-sm text-foreground">
+          Public signup is currently unavailable because no charities have been configured yet. An admin needs to add at least one active charity before new members can register.
+        </Card>
+      ) : null}
+
       <div className="mx-auto grid max-w-5xl gap-6 md:grid-cols-2">
         <Card className="space-y-6">
           <div>
             <h2 className="display-font text-3xl font-semibold">Sign in</h2>
             <p className="mt-2 text-sm leading-7 text-muted">
-              Access the subscriber dashboard or admin control center.
+              Access your subscriber dashboard here. Admin operators should use the dedicated admin login page.
             </p>
           </div>
           <form action={loginAction} className="space-y-4">
@@ -77,7 +82,7 @@ export default async function SignInPage({
           <div>
             <h2 className="display-font text-3xl font-semibold">Create account</h2>
             <p className="mt-2 text-sm leading-7 text-muted">
-              Create a new subscriber account and select your charity.
+              Create a new subscriber account and choose the charity your subscription will support.
             </p>
           </div>
           <form action={signupAction} className="space-y-4">
@@ -96,7 +101,11 @@ export default async function SignInPage({
             <div className="grid gap-4 sm:grid-cols-2">
               <label className="grid gap-2 text-sm font-medium">
                 Charity
-                <select name="charityId" className="h-12 rounded-2xl border border-line bg-white px-4 outline-none">
+                <select
+                  name="charityId"
+                  className="h-12 rounded-2xl border border-line bg-white px-4 outline-none"
+                  disabled={charities.length === 0}
+                >
                   {charities.map((charity) => (
                     <option key={charity.id} value={charity.id}>
                       {charity.name}
@@ -115,8 +124,11 @@ export default async function SignInPage({
                 </select>
               </label>
             </div>
-            <button className="h-12 w-full rounded-full bg-foreground font-medium text-background">
-              Create account
+            <button
+              disabled={charities.length === 0}
+              className="h-12 w-full rounded-full bg-foreground font-medium text-background disabled:cursor-not-allowed disabled:opacity-40"
+            >
+              Create subscriber account
             </button>
           </form>
         </Card>

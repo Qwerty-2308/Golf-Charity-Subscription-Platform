@@ -29,7 +29,7 @@ export default async function AdminPage({
   const snapshot = await getAdminSnapshot();
   const preview =
     params.preview === "1"
-      ? simulateMonthlyDraw({
+      ? await simulateMonthlyDraw({
           monthKey: toMonthKey(),
           mode: params.mode ?? "algorithmic",
           bias: params.bias ?? "most_frequent",
@@ -206,6 +206,11 @@ export default async function AdminPage({
                 </form>
               </div>
             ))}
+            {snapshot.claims.length === 0 ? (
+              <div className="rounded-[1.5rem] bg-white/75 p-4 text-sm text-muted">
+                No winner claims have been submitted yet.
+              </div>
+            ) : null}
           </div>
         </Card>
       </div>
@@ -252,6 +257,11 @@ export default async function AdminPage({
                 </form>
               </div>
             ))}
+            {snapshot.users.length === 0 ? (
+              <div className="rounded-[1.5rem] bg-white/75 p-4 text-sm text-muted">
+                No subscriber accounts exist yet.
+              </div>
+            ) : null}
           </div>
         </Card>
 
@@ -296,12 +306,15 @@ export default async function AdminPage({
                   <Badge tone="success">admin</Badge>
                 </div>
                 <p className="mt-3 text-sm text-muted">
-                  {("account" in item && item.account?.password)
-                    ? `Demo password: ${item.account.password}`
-                    : "Provisioned through Supabase Auth."}
+                  Provisioned through Supabase Auth.
                 </p>
               </div>
             ))}
+            {snapshot.admins.length === 0 ? (
+              <div className="rounded-[1.5rem] bg-white/75 p-4 text-sm text-muted">
+                No additional admin accounts exist beyond the currently authenticated operator.
+              </div>
+            ) : null}
           </div>
         </Card>
       </div>
@@ -345,6 +358,11 @@ export default async function AdminPage({
                 </div>
               </div>
             ))}
+            {snapshot.charities.length === 0 ? (
+              <div className="rounded-[1.5rem] bg-white/75 p-4 text-sm text-muted">
+                No charities are configured yet. Use the form above to create the first one.
+              </div>
+            ) : null}
           </div>
         </Card>
 
@@ -358,6 +376,7 @@ export default async function AdminPage({
                   {formatDate(audit.createdAt)} · {audit.summary}
                 </p>
               ))}
+              {snapshot.audits.length === 0 ? <p>No admin actions have been recorded yet.</p> : null}
             </div>
           </div>
         </Card>

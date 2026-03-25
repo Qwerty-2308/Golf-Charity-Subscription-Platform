@@ -7,14 +7,13 @@ const getSiteUrl = () => {
 
 const env = {
   siteUrl: getSiteUrl(),
-  // Hardcoded below to bypass Vercel Environment Variables dashboard
-  supabaseUrl: "https://uhhasznniuodcndftqxe.supabase.co", // Fixed the URL typo!
-  supabaseAnonKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoaGFzem5uaXVvZGNuZGZ0cXhlIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NzQzNDUzMjMsImV4cCI6MjA4OTkyMTMyM30.7bRThr6WThQd9Nl7wk4tiUKsF9TvSwQsjA_rVPIozlA",
-  supabaseServiceRoleKey: "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6InVoaGFzem5uaXVvZGNuZGZ0cXhlIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3NDM0NTMyMywiZXhwIjoyMDg5OTIxMzIzfQ.r8to44-cBvq6721Fx0kvhFstLD-erfX4N2YUv4sdn2M",
-  stripeSecretKey: "sk_test_51TET5BDn6p1G3FMEO19oEAg1THFEM3AlLhP3BgueSaPPbjpjVqgYFZoUFLabfmh4xgDSG4CJLugkKLzhUp5lGgCV00aZ7sA7jB",
-  stripeWebhookSecret: "whsec_L8IL4VDf4pxMxbyyHW9DkUW7wAKxH7WP",
-  resendApiKey: "re_i3MWoAZG_3UnfwPQdFVyyb5stih335GGx",
-  demoMode: false,
+  supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
+  supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
+  supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
+  stripeSecretKey: process.env.STRIPE_SECRET_KEY,
+  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
+  resendApiKey: process.env.RESEND_API_KEY,
+  demoMode: process.env.NEXT_PUBLIC_ENABLE_DEMO_MODE === "true",
 };
 
 export const stripePriceMap = {
@@ -35,7 +34,11 @@ export const stripePriceMap = {
 } as const;
 
 export function isDemoMode() {
-  return false;
+  return env.demoMode;
+}
+
+export function hasSupabaseConfig() {
+  return Boolean(env.supabaseUrl && env.supabaseAnonKey);
 }
 
 export function hasStripe() {

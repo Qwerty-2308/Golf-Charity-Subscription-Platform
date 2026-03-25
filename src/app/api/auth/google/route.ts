@@ -1,16 +1,11 @@
 import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
-import { isDemoMode } from "@/lib/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
 
 export async function GET(request: Request) {
-  if (isDemoMode()) {
-    return NextResponse.redirect(new URL("/sign-in?info=google-auth-is-available-after-live-supabase-setup", env.siteUrl));
-  }
-
   const supabase = await createSupabaseServerClient();
   if (!supabase) {
-    return NextResponse.redirect(new URL("/sign-in?error=server-error", env.siteUrl));
+    return NextResponse.redirect(new URL("/sign-in?error=supabase-auth-not-configured", env.siteUrl));
   }
 
   const origin = new URL(request.url).origin;

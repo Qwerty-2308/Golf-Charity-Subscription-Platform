@@ -1,13 +1,3 @@
-insert into public.organizations (id, name, slug, active)
-values
-  ('00000000-0000-0000-0000-000000000101', 'Digital Heroes Pilot', 'digital-heroes-pilot', true)
-on conflict (id) do nothing;
-
-insert into public.campaigns (id, organization_id, name, slug, active)
-values
-  ('00000000-0000-0000-0000-000000000201', '00000000-0000-0000-0000-000000000101', 'Summer Impact Drive', 'summer-impact-drive', false)
-on conflict (id) do nothing;
-
 insert into public.charities (
   id,
   name,
@@ -133,59 +123,5 @@ values
     'IN',
     'INR',
     true
-  )
-on conflict (id) do nothing;
-
--- Seed subscriber/admin profiles after creating matching auth users or by updating auth_user_id later.
-insert into public.profiles (
-  id,
-  full_name,
-  email,
-  role,
-  selected_charity_id,
-  charity_tier,
-  country_code,
-  currency_code
-)
-values
-  (
-    '00000000-0000-0000-0000-000000000601',
-    'Samira Khan',
-    'player@gooddrive.club',
-    'subscriber',
-    '00000000-0000-0000-0000-000000000301',
-    '20',
-    'IN',
-    'INR'
-  ),
-  (
-    '00000000-0000-0000-0000-000000000602',
-    'Owen Bailey',
-    'owen@gooddrive.club',
-    'subscriber',
-    '00000000-0000-0000-0000-000000000302',
-    '15',
-    'GB',
-    'INR'
-  ),
-  (
-    '00000000-0000-0000-0000-000000000603',
-    'Meera Nair',
-    'meera@gooddrive.club',
-    'subscriber',
-    '00000000-0000-0000-0000-000000000303',
-    '10',
-    'IN',
-    'INR'
-  ),
-  (
-    '00000000-0000-0000-0000-000000000604',
-    'Ava Hart',
-    'admin@gooddrive.club',
-    'admin',
-    '00000000-0000-0000-0000-000000000301',
-    '10',
-    'IN',
-    'INR'
   )
 on conflict (id) do nothing;

@@ -10,7 +10,7 @@ export async function POST() {
     return NextResponse.redirect(new URL("/sign-in", env.siteUrl));
   }
 
-  const subscription = getSubscriberSubscription(viewer.profile.id);
+  const subscription = await getSubscriberSubscription(viewer.profile.id);
   const stripe = getStripeServer();
 
   if (stripe && subscription?.stripeCustomerId) {
@@ -22,5 +22,5 @@ export async function POST() {
     return NextResponse.redirect(session.url);
   }
 
-  return NextResponse.redirect(new URL("/dashboard?billing=portal-demo", env.siteUrl));
+  return NextResponse.redirect(new URL("/dashboard?error=billing-portal-unavailable", env.siteUrl));
 }

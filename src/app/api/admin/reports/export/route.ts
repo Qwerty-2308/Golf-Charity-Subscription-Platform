@@ -7,7 +7,7 @@ export async function GET() {
     return new Response("Unauthorized", { status: 401 });
   }
 
-  const csv = buildAdminCsv();
+  const csv = await buildAdminCsv();
 
   return new Response(csv, {
     status: 200,

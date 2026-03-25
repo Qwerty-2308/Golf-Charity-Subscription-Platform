@@ -9,7 +9,7 @@ import { formatCurrency } from "@/lib/utils";
 
 export default async function PricingPage() {
   const viewer = await getCurrentViewer();
-  const plans = getAvailablePlanCards();
+  const plans = await getAvailablePlanCards();
   const charities = await getAvailableCharities();
 
   return (
@@ -25,12 +25,18 @@ export default async function PricingPage() {
           <div>
             <p className="display-font text-3xl font-semibold">Sign in before checkout</p>
             <p className="text-sm leading-7 text-muted">
-              Demo users can subscribe instantly, and new users can create an account in under a minute.
+              Sign in or create an account before starting a subscription checkout.
             </p>
           </div>
           <Link href="/sign-in" className={buttonStyles({ variant: "primary", size: "md" })}>
             Continue to sign-in
           </Link>
+        </Card>
+      ) : null}
+
+      {plans.length === 0 ? (
+        <Card className="border border-warning/30 bg-warning/10 text-sm text-foreground">
+          Pricing is not available yet because no active plans are configured in the database.
         </Card>
       ) : null}
 
@@ -76,6 +82,7 @@ export default async function PricingPage() {
                     name="charityId"
                     defaultValue={viewer.profile.selectedCharityId}
                     className="h-12 rounded-2xl border border-line bg-white px-4 outline-none"
+                    disabled={charities.length === 0}
                   >
                     {charities.map((charity) => (
                       <option key={charity.id} value={charity.id}>
@@ -98,7 +105,10 @@ export default async function PricingPage() {
                     ))}
                   </select>
                 </label>
-                <button className={buttonStyles({ variant: "primary", size: "md", fullWidth: true })}>
+                <button
+                  disabled={charities.length === 0}
+                  className={buttonStyles({ variant: "primary", size: "md", fullWidth: true }) + " disabled:cursor-not-allowed disabled:opacity-40"}
+                >
                   Start {plan.cadence} checkout
                 </button>
               </form>

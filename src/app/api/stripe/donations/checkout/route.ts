@@ -2,7 +2,6 @@ import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
 import { getCurrentViewer } from "@/lib/session";
 import { getStripeServer } from "@/lib/stripe";
-import { recordIndependentDonation } from "@/lib/platform";
 
 export async function POST(request: Request) {
   const viewer = await getCurrentViewer();
@@ -16,6 +15,9 @@ export async function POST(request: Request) {
     let amountStr = formData.get("amount");
     if (!amountStr) amountStr = "2500";
     const amountCents = Number(amountStr) * 100;
+    if (!Number.isFinite(amountCents) || amountCents <= 0) {
+      return NextResponse.redirect(new URL("/dashboard?error=invalid-donation-amount", env.siteUrl), 303);
+    }
 
     const stripe = getStripeServer();
     if (stripe) {
@@ -48,9 +50,7 @@ export async function POST(request: Request) {
       }
     }
 
-    // Fallback if Stripe is not available
-    await recordIndependentDonation(viewer.profile.id, charityId, amountCents);
-    return NextResponse.redirect(new URL("/dashboard?donation=demo-success", env.siteUrl), 303);
+    return NextResponse.redirect(new URL("/dashboard?error=donation-checkout-unavailable", env.siteUrl), 303);
 
   } catch (err) {
     console.error("Donation checkout error:", err);

@@ -9,6 +9,8 @@ import { formatCurrency, formatMonthLabel } from "@/lib/utils";
 
 export default async function Home() {
   const snapshot = await getHomeSnapshot();
+  const featuredCharity = snapshot.featuredCharity;
+  const hasSetupData = Boolean(featuredCharity) && snapshot.plans.length > 0;
 
   return (
     <div className="pb-20">
@@ -52,8 +54,13 @@ export default async function Home() {
                 <Badge tone="success">{formatMonthLabel(snapshot.currentMonth)} draw window is live</Badge>
                 <div className="space-y-3">
                   <p className="text-sm uppercase tracking-[0.24em] text-muted">Featured charity</p>
-                  <h2 className="display-font text-3xl font-semibold">{snapshot.featuredCharity.name}</h2>
-                  <p className="text-sm leading-7 text-muted">{snapshot.featuredCharity.description}</p>
+                  <h2 className="display-font text-3xl font-semibold">
+                    {featuredCharity?.name ?? "Platform setup in progress"}
+                  </h2>
+                  <p className="text-sm leading-7 text-muted">
+                    {featuredCharity?.description ??
+                      "Create your first active charity and plan configuration to bring the public experience fully online."}
+                  </p>
                 </div>
                 <div className="rounded-[1.5rem] bg-white/80 p-4">
                   <p className="text-xs uppercase tracking-[0.24em] text-muted">This month’s prize pool</p>
@@ -163,53 +170,66 @@ export default async function Home() {
                   </Link>
                 </div>
               ))}
+              {snapshot.plans.length === 0 ? (
+                <div className="rounded-[1.5rem] border border-line bg-white/80 p-4 text-sm text-muted">
+                  No plans are configured yet. Add pricing rows in Supabase before opening checkout to testers.
+                </div>
+              ) : null}
             </div>
           </Card>
         </div>
       </section>
 
-      <section className="section-shell py-10 md:py-20">
-        <Card className="grid gap-8 p-8 lg:grid-cols-[0.9fr_1.1fr] lg:p-10">
-          <div className="space-y-4">
-            <Badge tone="warning">Featured spotlight</Badge>
-            <h2 className="display-font text-4xl font-semibold">{snapshot.featuredCharity.name}</h2>
-            <p className="text-base leading-7 text-muted">{snapshot.featuredCharity.mission}</p>
-            <Link href={`/charities/${snapshot.featuredCharity.slug}`} className={buttonStyles({ variant: "dark", size: "md" })}>
-              Meet the charity
-            </Link>
-          </div>
-          <div className="grid gap-4 sm:grid-cols-2">
-            {snapshot.featuredCharity.upcomingEvents.map((event) => (
-              <div key={event.id} className="rounded-[1.75rem] bg-secondary p-5 text-white">
-                <p className="text-xs uppercase tracking-[0.24em] text-white/65">{event.location}</p>
-                <p className="mt-3 text-2xl font-semibold">{event.title}</p>
-                <p className="mt-2 text-sm text-white/85">{event.summary}</p>
-              </div>
-            ))}
-            <div className="rounded-[1.75rem] bg-accent/25 p-5">
-              <p className="text-xs uppercase tracking-[0.24em] text-muted">Raised so far</p>
-              <p className="mt-3 text-4xl font-semibold">
-                {formatCurrency(snapshot.featuredCharity.totalRaisedCents)}
-              </p>
-              <p className="mt-2 text-sm leading-6 text-muted">
-                A transparent ledger tracks every subscription-linked charity allocation and every independent donation.
-              </p>
+      {featuredCharity ? (
+        <section className="section-shell py-10 md:py-20">
+          <Card className="grid gap-8 p-8 lg:grid-cols-[0.9fr_1.1fr] lg:p-10">
+            <div className="space-y-4">
+              <Badge tone="warning">Featured spotlight</Badge>
+              <h2 className="display-font text-4xl font-semibold">{featuredCharity.name}</h2>
+              <p className="text-base leading-7 text-muted">{featuredCharity.mission}</p>
+              <Link href={`/charities/${featuredCharity.slug}`} className={buttonStyles({ variant: "dark", size: "md" })}>
+                Meet the charity
+              </Link>
             </div>
-          </div>
-        </Card>
-      </section>
+            <div className="grid gap-4 sm:grid-cols-2">
+              {featuredCharity.upcomingEvents.map((event) => (
+                <div key={event.id} className="rounded-[1.75rem] bg-secondary p-5 text-white">
+                  <p className="text-xs uppercase tracking-[0.24em] text-white/65">{event.location}</p>
+                  <p className="mt-3 text-2xl font-semibold">{event.title}</p>
+                  <p className="mt-2 text-sm text-white/85">{event.summary}</p>
+                </div>
+              ))}
+              <div className="rounded-[1.75rem] bg-accent/25 p-5">
+                <p className="text-xs uppercase tracking-[0.24em] text-muted">Raised so far</p>
+                <p className="mt-3 text-4xl font-semibold">
+                  {formatCurrency(featuredCharity.totalRaisedCents)}
+                </p>
+                <p className="mt-2 text-sm leading-6 text-muted">
+                  A transparent ledger tracks every subscription-linked charity allocation and every independent donation.
+                </p>
+              </div>
+            </div>
+          </Card>
+        </section>
+      ) : null}
 
       <section className="section-shell py-10 md:py-20">
         <Card className="mesh-card flex flex-col items-start justify-between gap-6 p-8 lg:flex-row lg:items-center">
           <div className="space-y-3">
-            <Badge>Ready for reviewer testing</Badge>
-            <h2 className="display-font text-4xl font-semibold">Sign in as a member or admin and explore every surface.</h2>
+            <Badge>{hasSetupData ? "Ready for testing" : "Complete setup"}</Badge>
+            <h2 className="display-font text-4xl font-semibold">
+              {hasSetupData
+                ? "Sign in as a member or admin and explore the full platform."
+                : "Create your first admin, configure charities, and bring the platform online."}
+            </h2>
             <p className="max-w-2xl text-base leading-7 text-muted">
-              The app includes seeded users, historical draws, claims, donations, and dashboards so reviewers can test end-to-end flows immediately.
+              {hasSetupData
+                ? "Use the dedicated member and admin auth flows to test subscriptions, score entry, draw management, charity controls, and winner verification."
+                : "The runtime no longer ships with fake users or fabricated dashboards. Setup now happens through real auth, real database content, and admin-controlled configuration."}
             </p>
           </div>
-          <Link href="/sign-in" className={buttonStyles({ variant: "primary", size: "lg" })}>
-            Open sign-in
+          <Link href={hasSetupData ? "/sign-in" : "/admin/bootstrap"} className={buttonStyles({ variant: "primary", size: "lg" })}>
+            {hasSetupData ? "Open sign-in" : "Create first admin"}
             <ArrowRight className="ml-2 h-5 w-5" />
           </Link>
         </Card>
