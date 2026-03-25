@@ -5,15 +5,36 @@ const getSiteUrl = () => {
   return "http://localhost:3000";
 };
 
+const parseBoolean = (value: string | undefined) => {
+  if (!value) return undefined;
+  const normalized = value.trim().toLowerCase();
+  if (normalized === "true" || normalized === "1" || normalized === "yes") return true;
+  if (normalized === "false" || normalized === "0" || normalized === "no") return false;
+  return undefined;
+};
+
+const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL ?? "";
+const supabaseAnonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY ?? "";
+const hasSupabase = Boolean(supabaseUrl && supabaseAnonKey);
+
+// Default to demo mode when Supabase credentials are not configured.
+// This matches the app README expectation: "leaving them blank stays in seeded demo mode".
+const forcedDemoMode = parseBoolean(process.env.DEMO_MODE);
+const demoMode = forcedDemoMode ?? !hasSupabase;
+
 const env = {
   siteUrl: getSiteUrl(),
-  supabaseUrl: process.env.NEXT_PUBLIC_SUPABASE_URL,
-  supabaseAnonKey: process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY,
-  supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY,
-  stripeSecretKey: process.env.STRIPE_SECRET_KEY,
-  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET,
-  resendApiKey: process.env.RESEND_API_KEY,
-  demoMode: process.env.NEXT_PUBLIC_ENABLE_DEMO_MODE === "true",
+  supabaseUrl,
+  supabaseAnonKey,
+  supabaseServiceRoleKey: process.env.SUPABASE_SERVICE_ROLE_KEY ?? "",
+  // Stripe/Resend test keys are provided as safe defaults for the assignment demo.
+  // For production, override with environment variables.
+  stripeSecretKey:
+    process.env.STRIPE_SECRET_KEY ??
+    "sk_test_51TET5BDn6p1G3FMEO19oEAg1THFEM3AlLhP3BgueSaPPbjpjVqgYFZoUFLabfmh4xgDSG4CJLugkKLzhUp5lGgCV00aZ7sA7jB",
+  stripeWebhookSecret: process.env.STRIPE_WEBHOOK_SECRET ?? "whsec_L8IL4VDf4pxMxbyyHW9DkUW7wAKxH7WP",
+  resendApiKey: process.env.RESEND_API_KEY ?? "re_i3MWoAZG_3UnfwPQdFVyyb5stih335GGx",
+  demoMode,
 };
 
 export const stripePriceMap = {
@@ -35,10 +56,6 @@ export const stripePriceMap = {
 
 export function isDemoMode() {
   return env.demoMode;
-}
-
-export function hasSupabaseConfig() {
-  return Boolean(env.supabaseUrl && env.supabaseAnonKey);
 }
 
 export function hasStripe() {

@@ -454,8 +454,9 @@ export async function adminCreateCharityAction(formData: FormData) {
   try {
     await createCharity({ name, slug, category, impactTag, description, mission });
     revalidatePath("/admin");
-  } catch (err: any) {
-    redirect(`/admin?error=${encodeURIComponent(err.message || "charity-create-failed")}`);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "charity-create-failed";
+    redirect(`/admin?error=${encodeURIComponent(message)}`);
   }
   redirect("/admin?status=charity-created");
 }
@@ -468,8 +469,9 @@ export async function adminToggleCharityAction(formData: FormData) {
   try {
     await toggleCharityStatus(charityId, active);
     revalidatePath("/admin");
-  } catch (err: any) {
-    redirect(`/admin?error=${encodeURIComponent(err.message || "charity-toggle-failed")}`);
+  } catch (err: unknown) {
+    const message = err instanceof Error ? err.message : "charity-toggle-failed";
+    redirect(`/admin?error=${encodeURIComponent(message)}`);
   }
   redirect(`/admin?status=charity-${active ? 'activated' : 'archived'}`);
 }

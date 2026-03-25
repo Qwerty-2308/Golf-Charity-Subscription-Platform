@@ -760,7 +760,41 @@ export async function createCharity(input: {
     const { createLiveCharity } = await import("@/lib/live-platform");
     return createLiveCharity(input);
   }
-  // No-op for demo mode unless specifically handled
+  return mutateDemoStore((store) => {
+    const normalizedSlug = input.slug.trim();
+    if (!normalizedSlug) {
+      throw new Error("Slug is required.");
+    }
+
+    const slugExists = store.charities.some((c) => c.slug.toLowerCase() === normalizedSlug.toLowerCase());
+    if (slugExists) {
+      throw new Error("A charity with that slug already exists.");
+    }
+
+    const id = `charity-${normalizedSlug}`;
+    const idExists = store.charities.some((c) => c.id === id);
+    if (idExists) {
+      throw new Error("A charity with that id already exists.");
+    }
+
+    const charity: Charity = {
+      id,
+      slug: normalizedSlug,
+      name: input.name.trim(),
+      category: input.category.trim(),
+      impactTag: input.impactTag.trim(),
+      description: input.description.trim(),
+      mission: input.mission.trim(),
+      featured: false,
+      images: [],
+      upcomingEvents: [],
+      totalRaisedCents: 0,
+      active: true,
+    };
+
+    store.charities.push(charity);
+    return charity;
+  });
 }
 
 export async function toggleCharityStatus(charityId: string, active: boolean) {
@@ -769,7 +803,15 @@ export async function toggleCharityStatus(charityId: string, active: boolean) {
     const { toggleLiveCharityStatus } = await import("@/lib/live-platform");
     return toggleLiveCharityStatus(charityId, active);
   }
-  // No-op for demo mode unless specifically handled
+  return mutateDemoStore((store) => {
+    const charity = store.charities.find((c) => c.id === charityId);
+    if (!charity) {
+      throw new Error("Charity not found.");
+    }
+
+    charity.active = active;
+    return charity;
+  });
 }
 
 export function getUserById(userId: string) {
