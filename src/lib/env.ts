@@ -34,7 +34,7 @@ export const stripePriceMap = {
 } as const;
 
 export function isDemoMode() {
-  return env.demoMode || !env.supabaseUrl || !env.supabaseAnonKey;
+  return false;
 }
 
 export function hasStripe() {
