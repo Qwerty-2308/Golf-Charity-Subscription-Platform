@@ -2,6 +2,7 @@ import { NextResponse } from "next/server";
 import { env } from "@/lib/env";
 import { getCurrentViewer } from "@/lib/session";
 import { resolveStripePriceId, getStripeServer } from "@/lib/stripe";
+import { activateDemoSubscription } from "@/lib/platform";
 import type { CharityTier, PlanCadence } from "@/lib/types";
 
 function getSubscriptionBaseCents(cadence: PlanCadence) {
