@@ -404,24 +404,28 @@ export async function adminCreateAccountAction(formData: FormData) {
       redirect("/admin?error=account-create-failed");
     }
 
-    const supabase = await createSupabaseServerClient();
-    const { data: charity } = await supabase!
+    // Use service-role client for profile upsert so we don't depend on
+    // potentially restrictive RLS policies for initial role provisioning.
+    const { data: charity } = await admin
       .from("charities")
       .select("id")
       .eq("active", true)
       .limit(1)
       .maybeSingle();
 
-    await supabase!.from("profiles").upsert({
-      auth_user_id: created.user.id,
-      full_name: fullName,
-      email: email.toLowerCase(),
-      role,
-      selected_charity_id: charity?.id ?? null,
-      charity_tier: "10",
-      country_code: "IN",
-      currency_code: "INR",
-    }, { onConflict: "auth_user_id" });
+    await admin.from("profiles").upsert(
+      {
+        auth_user_id: created.user.id,
+        full_name: fullName,
+        email: email.toLowerCase(),
+        role,
+        selected_charity_id: charity?.id ?? null,
+        charity_tier: "10",
+        country_code: "IN",
+        currency_code: "INR",
+      },
+      { onConflict: "auth_user_id" },
+    );
 
     revalidatePath("/admin");
     redirect("/admin?status=account-created");

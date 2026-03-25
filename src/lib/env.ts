@@ -20,7 +20,9 @@ const hasSupabase = Boolean(supabaseUrl && supabaseAnonKey);
 // Default to demo mode when Supabase credentials are not configured.
 // This matches the app README expectation: "leaving them blank stays in seeded demo mode".
 const forcedDemoMode = parseBoolean(process.env.DEMO_MODE);
-const demoMode = forcedDemoMode ?? !hasSupabase;
+// Even if someone explicitly sets DEMO_MODE=false, we still must not try to run
+// live mode without Supabase credentials, otherwise server components can throw.
+const demoMode = !hasSupabase ? true : forcedDemoMode ?? false;
 
 const env = {
   siteUrl: getSiteUrl(),
