@@ -2,6 +2,8 @@ import {
   adminCreateAccountAction,
   adminDeleteUserAction,
   adminResyncSubscriptionAction,
+  adminCreateCharityAction,
+  adminToggleCharityAction,
   publishDrawAction,
   reviewClaimAction,
 } from "@/app/actions";
@@ -307,6 +309,20 @@ export default async function AdminPage({
       <div className="grid gap-6 xl:grid-cols-[1fr_1fr]">
         <Card className="space-y-5">
           <h2 className="display-font text-3xl font-semibold">Charities</h2>
+          
+          <form action={adminCreateCharityAction} className="grid gap-4 rounded-[1.5rem] bg-white/80 p-4">
+            <h3 className="font-semibold text-lg">Add new charity</h3>
+            <div className="grid gap-4 md:grid-cols-2">
+              <label className="grid gap-2 text-sm font-medium">Name<input name="name" required className="h-11 rounded-2xl border border-line bg-white px-4 outline-none" /></label>
+              <label className="grid gap-2 text-sm font-medium">Slug<input name="slug" required className="h-11 rounded-2xl border border-line bg-white px-4 outline-none" /></label>
+              <label className="grid gap-2 text-sm font-medium">Category<input name="category" required className="h-11 rounded-2xl border border-line bg-white px-4 outline-none" /></label>
+              <label className="grid gap-2 text-sm font-medium">Impact Tag<input name="impactTag" required className="h-11 rounded-2xl border border-line bg-white px-4 outline-none" /></label>
+            </div>
+            <label className="grid gap-2 text-sm font-medium">Description<textarea name="description" required className="min-h-[80px] rounded-2xl border border-line bg-white p-4 outline-none" /></label>
+            <label className="grid gap-2 text-sm font-medium">Mission<textarea name="mission" required className="min-h-[80px] rounded-2xl border border-line bg-white p-4 outline-none" /></label>
+            <button className="h-11 rounded-full bg-foreground px-6 font-medium text-background self-start justify-self-start">Add charity</button>
+          </form>
+
           <div className="space-y-3">
             {snapshot.charities.map((charity) => (
               <div key={charity.id} className="rounded-[1.5rem] border border-line bg-white/80 p-4">
@@ -317,7 +333,16 @@ export default async function AdminPage({
                   </div>
                   <Badge tone={charity.active ? "success" : "danger"}>{charity.active ? "active" : "archived"}</Badge>
                 </div>
-                <p className="mt-3 text-sm text-muted">Raised: {formatCurrency(charity.totalRaisedCents)}</p>
+                <div className="mt-3 flex items-center justify-between gap-3">
+                  <p className="text-sm text-muted">Raised: {formatCurrency(charity.totalRaisedCents)}</p>
+                  <form action={adminToggleCharityAction}>
+                    <input type="hidden" name="charityId" value={charity.id} />
+                    <input type="hidden" name="active" value={(!charity.active).toString()} />
+                    <button className={"text-sm font-medium " + (charity.active ? "text-danger" : "text-success")}>
+                      {charity.active ? 'Archive' : 'Restore'}
+                    </button>
+                  </form>
+                </div>
               </div>
             ))}
           </div>

@@ -15,6 +15,8 @@ import {
   saveUserScore,
   submitWinnerClaim,
   updateUserPreferences,
+  createCharity,
+  toggleCharityStatus,
 } from "@/lib/platform";
 import { isDemoMode } from "@/lib/env";
 import { createSupabaseServerClient } from "@/lib/supabase/server";
@@ -413,4 +415,36 @@ export async function adminCreateAccountAction(formData: FormData) {
 
   revalidatePath("/admin");
   redirect("/admin?status=account-created");
+}
+
+export async function adminCreateCharityAction(formData: FormData) {
+  await requireAdmin();
+  const name = getRequiredString(formData, "name");
+  const slug = getRequiredString(formData, "slug");
+  const category = getRequiredString(formData, "category");
+  const impactTag = getRequiredString(formData, "impactTag");
+  const description = getRequiredString(formData, "description");
+  const mission = getRequiredString(formData, "mission");
+
+  try {
+    await createCharity({ name, slug, category, impactTag, description, mission });
+    revalidatePath("/admin");
+  } catch (err: any) {
+    redirect(`/admin?error=${encodeURIComponent(err.message || "charity-create-failed")}`);
+  }
+  redirect("/admin?status=charity-created");
+}
+
+export async function adminToggleCharityAction(formData: FormData) {
+  await requireAdmin();
+  const charityId = getRequiredString(formData, "charityId");
+  const active = formData.get("active") === "true";
+
+  try {
+    await toggleCharityStatus(charityId, active);
+    revalidatePath("/admin");
+  } catch (err: any) {
+    redirect(`/admin?error=${encodeURIComponent(err.message || "charity-toggle-failed")}`);
+  }
+  redirect(`/admin?status=charity-${active ? 'activated' : 'archived'}`);
 }

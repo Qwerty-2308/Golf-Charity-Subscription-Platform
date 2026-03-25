@@ -843,3 +843,37 @@ export async function getLiveHomeSnapshot() {
     currentMonth,
   };
 }
+
+export async function createLiveCharity(input: {
+  name: string;
+  slug: string;
+  category: string;
+  impactTag: string;
+  description: string;
+  mission: string;
+}) {
+  const supabase = createSupabaseAdminClient();
+  if (!supabase) throw new Error("Failed to initialize Supabase admin client");
+  const { data, error } = await supabase
+    .from("charities")
+    .insert({
+      name: input.name,
+      slug: input.slug,
+      category: input.category,
+      impact_tag: input.impactTag,
+      description: input.description,
+      mission: input.mission,
+    })
+    .select()
+    .single();
+
+  if (error) throw error;
+  return data;
+}
+
+export async function toggleLiveCharityStatus(charityId: string, active: boolean) {
+  const supabase = createSupabaseAdminClient();
+  if (!supabase) throw new Error("Failed to initialize Supabase admin client");
+  const { error } = await supabase.from("charities").update({ active }).eq("id", charityId);
+  if (error) throw error;
+}

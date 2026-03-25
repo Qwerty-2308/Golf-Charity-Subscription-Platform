@@ -653,6 +653,29 @@ export async function getAvailableCharities(): Promise<Charity[]> {
   return getDemoStore().charities.filter((charity) => charity.active);
 }
 
+export async function createCharity(input: {
+  name: string;
+  slug: string;
+  category: string;
+  impactTag: string;
+  description: string;
+  mission: string;
+}) {
+  if (!isDemoMode()) {
+    const { createLiveCharity } = await import("@/lib/live-platform");
+    return createLiveCharity(input);
+  }
+  // No-op for demo mode unless specifically handled
+}
+
+export async function toggleCharityStatus(charityId: string, active: boolean) {
+  if (!isDemoMode()) {
+    const { toggleLiveCharityStatus } = await import("@/lib/live-platform");
+    return toggleLiveCharityStatus(charityId, active);
+  }
+  // No-op for demo mode unless specifically handled
+}
+
 export function getDemoCredentials() {
   return {
     user: {
