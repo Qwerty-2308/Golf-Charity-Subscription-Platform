@@ -12,10 +12,10 @@ export async function GET() {
       const body = new URLSearchParams();
       for (const [k, v] of Object.entries(bodyParams)) body.append(k, String(v));
       
-      const res = await fetch(\`https://api.stripe.com/v1/\${path}\`, {
+      const res = await fetch(`https://api.stripe.com/v1/${path}`, {
         method: "POST",
         headers: {
-          Authorization: \`Bearer \${secretKey}\`,
+          Authorization: `Bearer ${secretKey}`,
           "Content-Type": "application/x-www-form-urlencoded"
         },
         body
@@ -53,22 +53,22 @@ export async function GET() {
       results.yearly[t] = yPrice.id;
     }
 
-    const envCode = \`export const stripePriceMap = {
+    const envCode = `export const stripePriceMap = {
   monthly: {
-    10: "\${results.monthly[10]}",
-    15: "\${results.monthly[15]}",
-    20: "\${results.monthly[20]}",
-    25: "\${results.monthly[25]}",
-    30: "\${results.monthly[30]}",
+    10: "${results.monthly[10]}",
+    15: "${results.monthly[15]}",
+    20: "${results.monthly[20]}",
+    25: "${results.monthly[25]}",
+    30: "${results.monthly[30]}",
   },
   yearly: {
-    10: "\${results.yearly[10]}",
-    15: "\${results.yearly[15]}",
-    20: "\${results.yearly[20]}",
-    25: "\${results.yearly[25]}",
-    30: "\${results.yearly[30]}",
+    10: "${results.yearly[10]}",
+    15: "${results.yearly[15]}",
+    20: "${results.yearly[20]}",
+    25: "${results.yearly[25]}",
+    30: "${results.yearly[30]}",
   },
-} as const;\`;
+} as const;`;
 
     return new NextResponse(envCode, { headers: { "Content-Type": "text/plain" } });
   } catch (err: any) {
