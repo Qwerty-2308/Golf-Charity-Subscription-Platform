@@ -181,7 +181,7 @@ export async function POST(request: Request) {
           .select("user_id, profiles(email, full_name)")
           .eq("stripe_subscription_id", sub.id)
           .single();
-        const profile = subRow?.profiles as { email: string; full_name: string } | null;
+        const profile = subRow?.profiles as unknown as { email: string; full_name: string } | null;
         if (profile) {
           await sendTransactionalEmail({
             to: profile.email,
@@ -193,7 +193,7 @@ export async function POST(request: Request) {
       }
 
       case "customer.subscription.updated": {
-        const sub = event.data.object as {
+        const sub = event.data.object as unknown as {
           id: string;
           status: string;
           cancel_at_period_end: boolean;
