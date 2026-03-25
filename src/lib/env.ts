@@ -66,4 +66,11 @@ export function hasResend() {
   return Boolean(env.resendApiKey);
 }
 
+export function hasSupabaseConfig() {
+  // Live-mode needs:
+  // - public anon key for server-side reads
+  // - service role key for trusted admin mutations and bootstrap flows
+  return Boolean(env.supabaseUrl && env.supabaseAnonKey && env.supabaseServiceRoleKey);
+}
+
 export { env };
